@@ -419,6 +419,7 @@ export function AssetsPage() {
       name: folderName,
       workspace_id: 0,
       parent_id: parentById[folderId] ?? null,
+      deleted_at: null,
       created_at: '',
       updated_at: '',
     })
@@ -430,6 +431,7 @@ export function AssetsPage() {
       name: folderName,
       workspace_id: 0,
       parent_id: parentById[folderId] ?? null,
+      deleted_at: null,
       created_at: '',
       updated_at: '',
     })
@@ -553,8 +555,8 @@ export function AssetsPage() {
         file: values.file,
         folder_id: values.folder_id,
         tags: values.tags,
-        description: values.description || null,
-        usage_suggestion: values.usage_suggestion || null,
+        description: values.description || undefined,
+        usage_suggestion: values.usage_suggestion || undefined,
       })
       setAddAssetOpen(false)
       if (values.folder_id !== selectedId) {

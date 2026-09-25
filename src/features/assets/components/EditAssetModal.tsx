@@ -113,6 +113,7 @@ export function EditAssetModal({
     return null
   }
 
+  const current = asset
   const busy = submitting || aiBusy
 
   function handleFileChange(next: File | null) {
@@ -122,9 +123,9 @@ export function EditAssetModal({
     setFile(next)
     if (!next) {
       setPreviewUrl(
-        asset.type === 'image' || asset.type === 'logo' ? asset.url : null,
+        current.type === 'image' || current.type === 'logo' ? current.url : null,
       )
-      setType(asset.type)
+      setType(current.type)
       return
     }
     setType(guessType(next))
