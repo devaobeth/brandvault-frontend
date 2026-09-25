@@ -1,0 +1,62 @@
+# Dependencies
+node_modules
+
+# Build output (Vite)
+dist
+dist-ssr
+*.local
+.vite
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment & secrets (assignment: never commit real secrets)
+# Keep .env.example only — document VITE_* vars without values that are secret.
+# Gemini / API keys belong on the backend only, never in the frontend.
+.env
+.env.*
+!.env.example
+.env.backup
+.env.production.local
+.env.development.local
+.env.test.local
+
+# TypeScript / tooling caches
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+.cache
+.turbo
+coverage
+playwright-report
+test-results
+
+# Deploy / hosting
+.vercel
+.netlify
+
+# Editors & AI tooling
+.vscode/*
+!.vscode/extensions.json
+.idea
+.cursor
+.codex
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Syne", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --color-vault-ink: #0b1220;
+  --color-vault-mist: #f3f5f8;
+  --color-vault-copper: #b86b3a;
+  --color-vault-steel: #5b6b7c;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes login-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes login-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes chip-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-rise,
+  .login-fade,
+  .login-chip {
+    animation: none !important;
+  }
+}
+
+.login-rise {
+  animation: login-rise 0.55s ease-out both;
+}
+
+.login-fade {
+  animation: login-fade 0.7s ease-out both;
+}
+
+.login-chip {
+  animation: chip-pulse 4.5s ease-in-out infinite;
+}
