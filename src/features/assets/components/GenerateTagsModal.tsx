@@ -1,5 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Asset } from '@/shared/types/api'
+import {
+  parseTags,
+  validateRequiredLongText,
+  validateTags,
+} from '@/features/assets/lib/validation'
+import { fieldClass } from '@/shared/lib/formField'
 import { Spinner } from '@/shared/components/Spinner'
 
 export type AiSuggestion = {
@@ -19,6 +25,12 @@ type GenerateTagsModalProps = {
   onSave: (suggestion: AiSuggestion) => Promise<void>
 }
 
+type FieldErrors = {
+  tags?: string
+  description?: string
+  usage_suggestion?: string
+}
+
 export function GenerateTagsModal({
   asset,
   loading,
@@ -32,6 +44,7 @@ export function GenerateTagsModal({
   const [tagsText, setTagsText] = useState('')
   const [description, setDescription] = useState('')
   const [usageSuggestion, setUsageSuggestion] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -44,6 +57,7 @@ export function GenerateTagsModal({
     setTagsText(suggestion.tags.join(', '))
     setDescription(suggestion.description)
     setUsageSuggestion(suggestion.usage_suggestion)
+    setFieldErrors({})
     setFormError(null)
   }, [suggestion])
 
@@ -64,32 +78,56 @@ export function GenerateTagsModal({
     return null
   }
 
+  function clearFieldError(key: keyof FieldErrors) {
+    setFieldErrors((current) => {
+      if (!current[key]) {
+        return current
+      }
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    const tags = tagsText
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean)
+    const tags = parseTags(tagsText)
+    const next: FieldErrors = {}
 
     if (tags.length === 0) {
-      setFormError('Add at least one tag.')
-      return
+      next.tags = 'Add at least one tag.'
+    } else {
+      const tagsError = validateTags(tags)
+      if (tagsError) {
+        next.tags = tagsError
+      }
     }
-    if (!description.trim()) {
-      setFormError('Description is required.')
-      return
+
+    const descriptionError = validateRequiredLongText(description, 'Description')
+    if (descriptionError) {
+      next.description = descriptionError
     }
-    if (!usageSuggestion.trim()) {
-      setFormError('Usage suggestion is required.')
+
+    const usageError = validateRequiredLongText(usageSuggestion, 'Usage suggestion')
+    if (usageError) {
+      next.usage_suggestion = usageError
+    }
+
+    setFieldErrors(next)
+    setFormError(null)
+    if (Object.keys(next).length > 0) {
       return
     }
 
-    setFormError(null)
-    await onSave({
-      tags,
-      description: description.trim(),
-      usage_suggestion: usageSuggestion.trim(),
-    })
+    try {
+      await onSave({
+        tags,
+        description: description.trim(),
+        usage_suggestion: usageSuggestion.trim(),
+      })
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Could not save tags.')
+    }
   }
 
   return (
@@ -148,7 +186,7 @@ export function GenerateTagsModal({
         ) : null}
 
         {suggestion ? (
-          <form onSubmit={(event) => void handleSubmit(event)} className="mt-4 space-y-4">
+          <form onSubmit={(event) => void handleSubmit(event)} className="mt-4 space-y-4" noValidate>
             {error ? (
               <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                 {error}
@@ -162,11 +200,22 @@ export function GenerateTagsModal({
               <input
                 id="ai-tags"
                 value={tagsText}
-                onChange={(event) => setTagsText(event.target.value)}
+                onChange={(event) => {
+                  setTagsText(event.target.value)
+                  clearFieldError('tags')
+                }}
                 placeholder="campaign, social, product"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                className={fieldClass(Boolean(fieldErrors.tags))}
+                aria-invalid={Boolean(fieldErrors.tags)}
+                aria-describedby={fieldErrors.tags ? 'ai-tags-error' : undefined}
               />
-              <p className="mt-1 text-xs text-slate-400">Comma-separated</p>
+              {fieldErrors.tags ? (
+                <p id="ai-tags-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.tags}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-slate-400">Comma-separated</p>
+              )}
             </div>
 
             <div>
@@ -179,10 +228,20 @@ export function GenerateTagsModal({
               <textarea
                 id="ai-description"
                 value={description}
-                onChange={(event) => setDescription(event.target.value)}
+                onChange={(event) => {
+                  setDescription(event.target.value)
+                  clearFieldError('description')
+                }}
                 rows={3}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                className={fieldClass(Boolean(fieldErrors.description))}
+                aria-invalid={Boolean(fieldErrors.description)}
+                aria-describedby={fieldErrors.description ? 'ai-description-error' : undefined}
               />
+              {fieldErrors.description ? (
+                <p id="ai-description-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.description}
+                </p>
+              ) : null}
             </div>
 
             <div>
@@ -195,13 +254,29 @@ export function GenerateTagsModal({
               <textarea
                 id="ai-usage"
                 value={usageSuggestion}
-                onChange={(event) => setUsageSuggestion(event.target.value)}
+                onChange={(event) => {
+                  setUsageSuggestion(event.target.value)
+                  clearFieldError('usage_suggestion')
+                }}
                 rows={2}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                className={fieldClass(Boolean(fieldErrors.usage_suggestion))}
+                aria-invalid={Boolean(fieldErrors.usage_suggestion)}
+                aria-describedby={
+                  fieldErrors.usage_suggestion ? 'ai-usage-error' : undefined
+                }
               />
+              {fieldErrors.usage_suggestion ? (
+                <p id="ai-usage-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.usage_suggestion}
+                </p>
+              ) : null}
             </div>
 
-            {formError ? <p className="text-xs text-red-600">{formError}</p> : null}
+            {formError ? (
+              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {formError}
+              </p>
+            ) : null}
 
             <div className="flex flex-wrap justify-end gap-2">
               <button

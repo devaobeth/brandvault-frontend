@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { ColorField, isValidHex } from '@/features/brand/components/ColorField'
 import { LogoUploadField, validateLogoFile } from '@/features/brand/components/LogoUploadField'
+import { NAME_MAX } from '@/features/assets/lib/validation'
 import { ErrorState } from '@/shared/components/ErrorState'
+import { fieldClass } from '@/shared/lib/formField'
 
 export type BrandFormValues = {
   name: string
@@ -44,6 +46,14 @@ export function BrandForm({
 
   function updateField<K extends keyof BrandFormValues>(key: K, value: BrandFormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }))
+    setFieldErrors((current) => {
+      if (!current[key]) {
+        return current
+      }
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
   }
 
   function handleLogoChange(file: File | null, previewUrl: string) {
@@ -57,12 +67,17 @@ export function BrandForm({
 
     if (!next.name.trim()) {
       errors.name = 'Brand name is required.'
+    } else if (next.name.trim().length > NAME_MAX) {
+      errors.name = `Brand name must be ${NAME_MAX} characters or fewer.`
     }
     if (!isValidHex(next.primary_color.trim())) {
       errors.primary_color = 'Use a valid hex color like #1A73E8.'
     }
     if (!isValidHex(next.secondary_color.trim())) {
       errors.secondary_color = 'Use a valid hex color like #34A853.'
+    }
+    if (next.default_font.trim().length > NAME_MAX) {
+      errors.default_font = `Font name must be ${NAME_MAX} characters or fewer.`
     }
     if (file) {
       const logoError = validateLogoFile(file)
@@ -103,16 +118,22 @@ export function BrandForm({
     <form
       className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
       onSubmit={handleSubmit}
+      noValidate
     >
       <label className="block text-sm">
         <span className="mb-1 block font-medium text-slate-700">Brand name</span>
         <input
-          className="w-full rounded-md border border-slate-300 px-3 py-2"
+          className={fieldClass(Boolean(fieldErrors.name))}
           value={values.name}
           onChange={(e) => updateField('name', e.target.value)}
-          required
+          aria-invalid={Boolean(fieldErrors.name)}
+          aria-describedby={fieldErrors.name ? 'brand-name-error' : undefined}
         />
-        {fieldErrors.name ? <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p> : null}
+        {fieldErrors.name ? (
+          <p id="brand-name-error" className="mt-1 text-xs text-red-600">
+            {fieldErrors.name}
+          </p>
+        ) : null}
       </label>
 
       <ColorField
@@ -138,11 +159,18 @@ export function BrandForm({
       <label className="block text-sm">
         <span className="mb-1 block font-medium text-slate-700">Default font (optional)</span>
         <input
-          className="w-full rounded-md border border-slate-300 px-3 py-2"
+          className={fieldClass(Boolean(fieldErrors.default_font))}
           value={values.default_font}
           onChange={(e) => updateField('default_font', e.target.value)}
           placeholder="Inter"
+          aria-invalid={Boolean(fieldErrors.default_font)}
+          aria-describedby={fieldErrors.default_font ? 'brand-font-error' : undefined}
         />
+        {fieldErrors.default_font ? (
+          <p id="brand-font-error" className="mt-1 text-xs text-red-600">
+            {fieldErrors.default_font}
+          </p>
+        ) : null}
       </label>
 
       {formError ? <ErrorState message={formError} /> : null}

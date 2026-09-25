@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { Asset, AssetType } from '@/shared/types/api'
+import {
+  parseTags,
+  validateAssetFile,
+  validateName,
+  validateOptionalLongText,
+  validateTags,
+} from '@/features/assets/lib/validation'
+import { fieldClass, fileFieldClass } from '@/shared/lib/formField'
 
 export type EditAssetFormValues = {
   name: string
@@ -31,6 +39,14 @@ type EditAssetModalProps = {
     description: string
     usage_suggestion: string
   }>
+}
+
+type FieldErrors = {
+  file?: string
+  name?: string
+  tags?: string
+  description?: string
+  usage_suggestion?: string
 }
 
 function guessType(file: File): AssetType {
@@ -77,7 +93,8 @@ export function EditAssetModal({
   const [tagsText, setTagsText] = useState('')
   const [description, setDescription] = useState('')
   const [usageSuggestion, setUsageSuggestion] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [formError, setFormError] = useState<string | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
 
   useEffect(() => {
@@ -94,7 +111,8 @@ export function EditAssetModal({
     setTagsText(asset.tags?.length ? asset.tags.join(', ') : '')
     setDescription(asset.description ?? '')
     setUsageSuggestion(asset.usage_suggestion ?? '')
-    setError(null)
+    setFieldErrors({})
+    setFormError(null)
     setAiBusy(false)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -116,17 +134,58 @@ export function EditAssetModal({
   const current = asset
   const busy = submitting || aiBusy
 
+  function clearFieldError(key: keyof FieldErrors) {
+    setFieldErrors((currentErrors) => {
+      if (!currentErrors[key]) {
+        return currentErrors
+      }
+      const next = { ...currentErrors }
+      delete next[key]
+      return next
+    })
+  }
+
+  function validateFields(): FieldErrors {
+    const next: FieldErrors = {}
+    const nameError = validateName(name)
+    if (nameError) {
+      next.name = nameError
+    }
+    const fileError = validateAssetFile(file, { required: false })
+    if (fileError) {
+      next.file = fileError
+    }
+    const tagsError = validateTags(parseTags(tagsText))
+    if (tagsError) {
+      next.tags = tagsError
+    }
+    const descriptionError = validateOptionalLongText(description, 'Description')
+    if (descriptionError) {
+      next.description = descriptionError
+    }
+    const usageError = validateOptionalLongText(usageSuggestion, 'Usage suggestion')
+    if (usageError) {
+      next.usage_suggestion = usageError
+    }
+    return next
+  }
+
   function handleFileChange(next: File | null) {
     if (previewUrl?.startsWith('blob:')) {
       URL.revokeObjectURL(previewUrl)
     }
     setFile(next)
+    clearFieldError('file')
     if (!next) {
       setPreviewUrl(
         current.type === 'image' || current.type === 'logo' ? current.url : null,
       )
       setType(current.type)
       return
+    }
+    const fileError = validateAssetFile(next, { required: false })
+    if (fileError) {
+      setFieldErrors((currentErrors) => ({ ...currentErrors, file: fileError }))
     }
     setType(guessType(next))
     if (next.type.startsWith('image/')) {
@@ -137,17 +196,17 @@ export function EditAssetModal({
   }
 
   async function handleGenerate() {
-    const trimmedName = name.trim()
-    if (!trimmedName) {
-      setError('Name is required before generating tags.')
+    const nameError = validateName(name)
+    if (nameError) {
+      setFieldErrors({ name: nameError })
       return
     }
-
-    setError(null)
+    setFieldErrors({})
+    setFormError(null)
     setAiBusy(true)
     try {
       const suggestion = await onGenerateTags({
-        name: trimmedName,
+        name: name.trim(),
         type,
         file: file ?? undefined,
       })
@@ -155,7 +214,7 @@ export function EditAssetModal({
       setDescription(suggestion.description)
       setUsageSuggestion(suggestion.usage_suggestion)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not generate tags.')
+      setFormError(err instanceof Error ? err.message : 'Could not generate tags.')
     } finally {
       setAiBusy(false)
     }
@@ -163,30 +222,25 @@ export function EditAssetModal({
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    const trimmedName = name.trim()
+    setFormError(null)
 
-    if (!trimmedName) {
-      setError('Name is required.')
+    const next = validateFields()
+    setFieldErrors(next)
+    if (Object.keys(next).length > 0) {
       return
     }
 
-    const tags = tagsText
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean)
-
-    setError(null)
     try {
       await onSubmit({
-        name: trimmedName,
+        name: name.trim(),
         file: file ?? undefined,
         folder_id: folderId,
-        tags,
+        tags: parseTags(tagsText),
         description: description.trim(),
         usage_suggestion: usageSuggestion.trim(),
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update asset.')
+      setFormError(err instanceof Error ? err.message : 'Could not update asset.')
     }
   }
 
@@ -210,7 +264,7 @@ export function EditAssetModal({
           Update details, optionally replace the file, and review AI metadata.
         </p>
 
-        <form onSubmit={(event) => void handleSubmit(event)} className="mt-4 space-y-4">
+        <form onSubmit={(event) => void handleSubmit(event)} className="mt-4 space-y-4" noValidate>
           <div>
             <label htmlFor="edit-asset-file" className="mb-1 block text-sm font-medium text-slate-700">
               File
@@ -221,11 +275,18 @@ export function EditAssetModal({
               type="file"
               accept={accept}
               onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
-              className="w-full cursor-pointer rounded-md border border-slate-300 px-3 py-2 text-sm file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1"
+              className={fileFieldClass(Boolean(fieldErrors.file))}
+              aria-invalid={Boolean(fieldErrors.file)}
+              aria-describedby={fieldErrors.file ? 'edit-asset-file-error' : undefined}
             />
             <p className="mt-1 truncate text-xs text-slate-500">
               {file ? `New file: ${file.name}` : 'Leave empty to keep the current file.'}
             </p>
+            {fieldErrors.file ? (
+              <p id="edit-asset-file-error" className="mt-1 text-xs text-red-600">
+                {fieldErrors.file}
+              </p>
+            ) : null}
             {previewUrl ? (
               <img
                 src={previewUrl}
@@ -242,9 +303,19 @@ export function EditAssetModal({
             <input
               id="edit-asset-name"
               value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+              onChange={(event) => {
+                setName(event.target.value)
+                clearFieldError('name')
+              }}
+              className={fieldClass(Boolean(fieldErrors.name))}
+              aria-invalid={Boolean(fieldErrors.name)}
+              aria-describedby={fieldErrors.name ? 'edit-asset-name-error' : undefined}
             />
+            {fieldErrors.name ? (
+              <p id="edit-asset-name-error" className="mt-1 text-xs text-red-600">
+                {fieldErrors.name}
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -258,7 +329,7 @@ export function EditAssetModal({
                 const value = event.target.value
                 setFolderId(value === '' ? null : Number(value))
               }}
-              className="w-full cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              className={fieldClass(false, 'cursor-pointer')}
             >
               {folderOptions.map((option) => (
                 <option
@@ -292,10 +363,20 @@ export function EditAssetModal({
                 <input
                   id="edit-asset-tags"
                   value={tagsText}
-                  onChange={(event) => setTagsText(event.target.value)}
+                  onChange={(event) => {
+                    setTagsText(event.target.value)
+                    clearFieldError('tags')
+                  }}
                   placeholder="campaign, social, product"
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                  className={fieldClass(Boolean(fieldErrors.tags))}
+                  aria-invalid={Boolean(fieldErrors.tags)}
+                  aria-describedby={fieldErrors.tags ? 'edit-asset-tags-error' : undefined}
                 />
+                {fieldErrors.tags ? (
+                  <p id="edit-asset-tags-error" className="mt-1 text-xs text-red-600">
+                    {fieldErrors.tags}
+                  </p>
+                ) : null}
               </div>
 
               <div>
@@ -308,10 +389,22 @@ export function EditAssetModal({
                 <textarea
                   id="edit-asset-description"
                   value={description}
-                  onChange={(event) => setDescription(event.target.value)}
+                  onChange={(event) => {
+                    setDescription(event.target.value)
+                    clearFieldError('description')
+                  }}
                   rows={2}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                  className={fieldClass(Boolean(fieldErrors.description))}
+                  aria-invalid={Boolean(fieldErrors.description)}
+                  aria-describedby={
+                    fieldErrors.description ? 'edit-asset-description-error' : undefined
+                  }
                 />
+                {fieldErrors.description ? (
+                  <p id="edit-asset-description-error" className="mt-1 text-xs text-red-600">
+                    {fieldErrors.description}
+                  </p>
+                ) : null}
               </div>
 
               <div>
@@ -321,15 +414,31 @@ export function EditAssetModal({
                 <textarea
                   id="edit-asset-usage"
                   value={usageSuggestion}
-                  onChange={(event) => setUsageSuggestion(event.target.value)}
+                  onChange={(event) => {
+                    setUsageSuggestion(event.target.value)
+                    clearFieldError('usage_suggestion')
+                  }}
                   rows={2}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                  className={fieldClass(Boolean(fieldErrors.usage_suggestion))}
+                  aria-invalid={Boolean(fieldErrors.usage_suggestion)}
+                  aria-describedby={
+                    fieldErrors.usage_suggestion ? 'edit-asset-usage-error' : undefined
+                  }
                 />
+                {fieldErrors.usage_suggestion ? (
+                  <p id="edit-asset-usage-error" className="mt-1 text-xs text-red-600">
+                    {fieldErrors.usage_suggestion}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
 
-          {error ? <p className="text-xs text-red-600">{error}</p> : null}
+          {formError ? (
+            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {formError}
+            </p>
+          ) : null}
 
           <div className="flex justify-end gap-2">
             <button

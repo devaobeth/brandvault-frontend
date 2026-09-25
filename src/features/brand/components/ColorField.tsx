@@ -1,4 +1,5 @@
 import type { ChangeEvent } from 'react'
+import { fieldClass } from '@/shared/lib/formField'
 
 const HEX_PATTERN = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/
 
@@ -33,6 +34,8 @@ export function ColorField({ label, value, onChange, error }: ColorFieldProps) {
     onChange(event.target.value.toUpperCase())
   }
 
+  const errorId = `${label.replace(/\s+/g, '-').toLowerCase()}-color-error`
+
   return (
     <div className="space-y-2">
       <span className="block text-sm font-medium text-slate-700">{label}</span>
@@ -54,11 +57,16 @@ export function ColorField({ label, value, onChange, error }: ColorFieldProps) {
           value={value}
           onChange={handleHexChange}
           placeholder="#1A73E8"
-          className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm uppercase"
+          className={`${fieldClass(Boolean(error))} font-mono uppercase`}
           aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
         />
       </div>
-      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+      {error ? (
+        <p id={errorId} className="text-xs text-red-600">
+          {error}
+        </p>
+      ) : null}
     </div>
   )
 }

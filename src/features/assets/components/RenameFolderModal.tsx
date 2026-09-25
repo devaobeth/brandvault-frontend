@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Folder } from '@/shared/types/api'
+import { validateName } from '@/features/assets/lib/validation'
+import { fieldClass } from '@/shared/lib/formField'
 
 type RenameFolderModalProps = {
   folder: Folder | null
@@ -15,12 +17,14 @@ export function RenameFolderModal({
   onSubmit,
 }: RenameFolderModalProps) {
   const [name, setName] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [nameError, setNameError] = useState<string | undefined>()
+  const [formError, setFormError] = useState<string | null>(null)
 
   useEffect(() => {
     if (folder) {
       setName(folder.name)
-      setError(null)
+      setNameError(undefined)
+      setFormError(null)
     }
   }, [folder])
 
@@ -30,16 +34,16 @@ export function RenameFolderModal({
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    const trimmed = name.trim()
-    if (!trimmed) {
-      setError('Name is required.')
+    const error = validateName(name, 'Folder name')
+    setNameError(error)
+    setFormError(null)
+    if (error) {
       return
     }
-    setError(null)
     try {
-      await onSubmit(trimmed)
+      await onSubmit(name.trim())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not rename.')
+      setFormError(err instanceof Error ? err.message : 'Could not rename.')
     }
   }
 
@@ -54,14 +58,34 @@ export function RenameFolderModal({
         <h2 id="rename-folder-title" className="text-lg font-semibold text-slate-900">
           Rename folder
         </h2>
-        <form onSubmit={(event) => void handleSubmit(event)} className="mt-4 space-y-3">
-          <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            autoFocus
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
-          />
-          {error ? <p className="text-xs text-red-600">{error}</p> : null}
+        <form onSubmit={(event) => void handleSubmit(event)} className="mt-4 space-y-3" noValidate>
+          <div>
+            <label htmlFor="rename-folder-name" className="sr-only">
+              Name
+            </label>
+            <input
+              id="rename-folder-name"
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value)
+                setNameError(undefined)
+              }}
+              autoFocus
+              className={fieldClass(Boolean(nameError))}
+              aria-invalid={Boolean(nameError)}
+              aria-describedby={nameError ? 'rename-folder-name-error' : undefined}
+            />
+            {nameError ? (
+              <p id="rename-folder-name-error" className="mt-1 text-xs text-red-600">
+                {nameError}
+              </p>
+            ) : null}
+          </div>
+          {formError ? (
+            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {formError}
+            </p>
+          ) : null}
           <div className="flex justify-end gap-2">
             <button
               type="button"

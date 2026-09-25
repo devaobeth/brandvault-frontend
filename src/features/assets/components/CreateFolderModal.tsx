@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from 'react'
+import { validateName } from '@/features/assets/lib/validation'
+import { fieldClass } from '@/shared/lib/formField'
 
 type CreateFolderModalProps = {
   open: boolean
@@ -16,7 +18,8 @@ export function CreateFolderModal({
   onSubmit,
 }: CreateFolderModalProps) {
   const [name, setName] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [nameError, setNameError] = useState<string | undefined>()
+  const [formError, setFormError] = useState<string | null>(null)
 
   if (!open) {
     return null
@@ -24,19 +27,27 @@ export function CreateFolderModal({
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    const trimmed = name.trim()
-    if (!trimmed) {
-      setError('Folder name is required.')
+    const error = validateName(name, 'Folder name')
+    setNameError(error)
+    setFormError(null)
+    if (error) {
       return
     }
 
-    setError(null)
     try {
-      await onSubmit(trimmed)
+      await onSubmit(name.trim())
       setName('')
+      setNameError(undefined)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create folder.')
+      setFormError(err instanceof Error ? err.message : 'Could not create folder.')
     }
+  }
+
+  function handleClose() {
+    setName('')
+    setNameError(undefined)
+    setFormError(null)
+    onClose()
   }
 
   return (
@@ -52,7 +63,7 @@ export function CreateFolderModal({
         </h2>
         <p className="mt-1 text-sm text-slate-500">Inside: {parentLabel}</p>
 
-        <form onSubmit={(event) => void handleSubmit(event)} className="mt-4 space-y-4">
+        <form onSubmit={(event) => void handleSubmit(event)} className="mt-4 space-y-4" noValidate>
           <div>
             <label htmlFor="folder-name" className="mb-1 block text-sm font-medium text-slate-700">
               Name
@@ -60,21 +71,32 @@ export function CreateFolderModal({
             <input
               id="folder-name"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value)
+                setNameError(undefined)
+              }}
               autoFocus
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+              className={fieldClass(Boolean(nameError))}
+              aria-invalid={Boolean(nameError)}
+              aria-describedby={nameError ? 'folder-name-error' : undefined}
             />
-            {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
+            {nameError ? (
+              <p id="folder-name-error" className="mt-1 text-xs text-red-600">
+                {nameError}
+              </p>
+            ) : null}
           </div>
+
+          {formError ? (
+            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {formError}
+            </p>
+          ) : null}
 
           <div className="flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => {
-                setName('')
-                setError(null)
-                onClose()
-              }}
+              onClick={handleClose}
               className="cursor-pointer rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
             >
               Cancel

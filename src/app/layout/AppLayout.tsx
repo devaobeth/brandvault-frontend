@@ -52,6 +52,9 @@ export function AppLayout() {
             <NavLink to="/trash" className={linkClass}>
               Trash
             </NavLink>
+            <NavLink to="/activity" className={linkClass}>
+              Activity
+            </NavLink>
             <button
               type="button"
               onClick={requestLogout}

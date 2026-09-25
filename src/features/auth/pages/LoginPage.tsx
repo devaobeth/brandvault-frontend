@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '@/features/auth/context'
+import { fieldClass as baseFieldClass } from '@/shared/lib/formField'
 
 type FieldErrors = {
   name?: string
@@ -11,12 +12,7 @@ type FieldErrors = {
 }
 
 function fieldClass(hasError: boolean) {
-  return [
-    'mt-1.5 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-900 outline-none transition',
-    hasError
-      ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100'
-      : 'border-slate-300 focus:border-slate-500 focus:ring-2 focus:ring-slate-100',
-  ].join(' ')
+  return baseFieldClass(hasError, 'mt-1.5')
 }
 
 function apiErrorMessage(err: unknown, fallback: string) {

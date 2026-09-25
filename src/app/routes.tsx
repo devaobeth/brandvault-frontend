@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from '@/app/layout/AppLayout'
 import { ProtectedRoute } from '@/app/routes/ProtectedRoute'
+import { ActivityPage } from '@/features/activity/pages/ActivityPage'
 import { AuthProvider } from '@/features/auth/context'
 import { LoginPage } from '@/features/auth/pages/LoginPage'
 import { AssetsPage } from '@/features/assets/pages/AssetsPage'
@@ -19,6 +20,7 @@ export function AppRouter() {
               <Route path="/brand" element={<BrandPage />} />
               <Route path="/assets" element={<AssetsPage />} />
               <Route path="/trash" element={<TrashPage />} />
+              <Route path="/activity" element={<ActivityPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
